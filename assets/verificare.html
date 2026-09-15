@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copie verificată</title>
+<style>
+  :root{
+    --ink:#1b1b1f; --ink-soft:#4a4a55; --muted:#6b7280; --line:#e3e3e8;
+    --bg:#faf9f7; --card:#ffffff;
+    --confirmed:#1a7f37; --partial:#9a6700; --contradicted:#b42318; --notfound:#6b7280;
+    --confirmed-bg:#e8f5ec; --partial-bg:#fdf3dd; --contradicted-bg:#fdeceb; --notfound-bg:#f0f1f3;
+    --serif:Georgia,"Charter","Iowan Old Style","Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);line-height:1.72;font-size:18px}
+  .wrap{max-width:46rem;margin:0 auto;padding:2.25rem 1.25rem 5rem}
+  header.doc-head{margin-bottom:1.75rem}
+  .kicker{font-family:var(--sans);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);font-weight:600;margin:0 0 .75rem}
+  h1.doc-title{font-size:2.05rem;line-height:1.22;margin:0 0 .8rem;font-weight:700;letter-spacing:-.01em}
+  .doc-meta{font-family:var(--sans);font-size:.82rem;color:var(--muted);margin:0;line-height:1.6}
+
+  /* ---------- verification banner ---------- */
+  #banner{
+    font-family:var(--sans);border-radius:14px;padding:1rem 1.15rem;margin:0 0 1.5rem;
+    border:1px solid transparent;font-size:.88rem;line-height:1.55
+  }
+  #banner.ok{background:var(--confirmed-bg);border-color:#bfe0c9;color:#14532d}
+  #banner.warn{background:var(--partial-bg);border-color:#eed9a3;color:#713f12}
+  #banner.err{background:var(--contradicted-bg);border-color:#f3c9c5;color:#7f1d1d}
+  #banner .b-title{font-weight:700;margin:0 0 .3rem;display:flex;align-items:center;gap:.5rem}
+  #banner .b-title .ico{font-size:1.05rem}
+  #banner p{margin:.3rem 0 0}
+  #banner ul{margin:.5rem 0 0;padding-left:1.1rem}
+  #banner li{margin:.18rem 0}
+  #banner code{font-family:var(--mono);font-size:.85em;background:rgba(0,0,0,.06);
+    padding:.05rem .3rem;border-radius:4px}
+  #drop{
+    margin-top:.85rem;border:1.5px dashed currentColor;border-radius:10px;padding:.85rem 1rem;
+    text-align:center;cursor:pointer;opacity:.85;transition:background-color .15s ease,opacity .15s ease
+  }
+  #drop:hover,#drop.hot{background:rgba(255,255,255,.55);opacity:1}
+  #drop b{font-weight:700}
+  #drop small{display:block;font-size:.78rem;opacity:.8;margin-top:.2rem}
+  #drop input{display:none}
+  .prov-list{margin:.6rem 0 0;padding:0;list-style:none;font-size:.83rem}
+  .prov-list li{display:flex;gap:.45rem;align-items:baseline;margin:.15rem 0}
+  .prov-list .pmark{font-weight:700;flex:0 0 auto}
+
+  /* ---------- summary strip ---------- */
+  #summary{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:1.15rem 1.3rem 1.25rem;margin:0 0 2.75rem;
+    font-family:var(--sans);font-size:.9rem;line-height:1.55;
+    box-shadow:0 1px 2px rgba(20,20,30,.04),0 8px 24px -18px rgba(20,20,30,.35)
+  }
+  #summary h2{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 .7rem;font-weight:700}
+  .sum-count{font-size:1rem;color:var(--ink-soft);margin:0 0 .8rem}
+  .sum-count b{color:var(--ink)}
+  .chips{display:flex;flex-wrap:wrap;gap:.45rem;margin:0 0 .2rem}
+  .chip{display:inline-flex;align-items:center;gap:.4rem;border-radius:999px;
+    padding:.22rem .68rem;font-size:.8rem;font-weight:600;border:1px solid transparent;white-space:nowrap}
+  .chip .dot{width:.55rem;height:.55rem;border-radius:50%;flex:0 0 auto}
+  .chip.v-confirmed{background:var(--confirmed-bg);color:var(--confirmed);border-color:#bfe0c9}
+  .chip.v-partial{background:var(--partial-bg);color:var(--partial);border-color:#eed9a3}
+  .chip.v-contradicted{background:var(--contradicted-bg);color:var(--contradicted);border-color:#f3c9c5}
+  .chip.v-notfound{background:var(--notfound-bg);color:var(--notfound);border-color:#d9dbe0}
+  .chip.v-confirmed .dot{background:var(--confirmed)}
+  .chip.v-partial .dot{background:var(--partial)}
+  .chip.v-contradicted .dot{background:var(--contradicted)}
+  .chip.v-notfound .dot{background:var(--notfound)}
+
+  #findings{margin:1.15rem 0 0;padding:1rem 0 0;border-top:1px solid var(--line)}
+  #findings .findings-label{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);font-weight:700;margin:0 0 .6rem}
+  .finding{display:flex;gap:.6rem;align-items:flex-start;width:100%;text-align:left;
+    background:none;border:0;padding:.3rem .35rem;margin:0 -.35rem .12rem;border-radius:8px;
+    font:inherit;color:var(--ink-soft);cursor:pointer;line-height:1.45}
+  .finding:hover{background:#f4f4f7;color:var(--ink)}
+  .finding .fnum{flex:0 0 auto;min-width:1.35rem;height:1.35rem;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:.68rem;font-weight:700;color:#fff;margin-top:.08rem}
+  .finding .ftext{flex:1 1 auto;font-size:.88rem}
+  .finding .fverdict{font-weight:600}
+  .v-confirmed>.fnum,.bubble.v-confirmed{background:var(--confirmed)}
+  .v-partial>.fnum,.bubble.v-partial{background:var(--partial)}
+  .v-contradicted>.fnum,.bubble.v-contradicted{background:var(--contradicted)}
+  .v-notfound>.fnum,.bubble.v-notfound{background:var(--notfound)}
+  .finding.v-confirmed .fverdict{color:var(--confirmed)}
+  .finding.v-partial .fverdict{color:var(--partial)}
+  .finding.v-contradicted .fverdict{color:var(--contradicted)}
+  .finding.v-notfound .fverdict{color:var(--notfound)}
+
+  /* ---------- document body ---------- */
+  article#doc p{margin:0 0 1.35rem}
+  article#doc h2,article#doc h3{line-height:1.3;margin:2.2rem 0 .9rem}
+  article#doc h2{font-size:1.45rem}
+  article#doc h3{font-size:1.2rem}
+  article#doc blockquote{margin:0 0 1.35rem;padding-left:1.1rem;
+    border-left:3px solid var(--line);color:var(--ink-soft)}
+  article#doc ul,article#doc ol{margin:0 0 1.35rem;padding-left:1.4rem}
+  article#doc li{margin:.2rem 0}
+  article#doc hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
+  article#doc code{font-family:var(--mono);font-size:.88em;background:#f2f2f5;
+    padding:.08rem .3rem;border-radius:4px}
+  .claim{text-decoration-line:underline;text-decoration-style:dotted;text-decoration-thickness:2px;
+    text-underline-offset:.22em;transition:background-color .35s ease}
+  .claim.s-confirmed{text-decoration-color:var(--confirmed)}
+  .claim.s-partial{text-decoration-color:var(--partial)}
+  .claim.s-contradicted{text-decoration-color:var(--contradicted)}
+  .claim.s-notfound{text-decoration-color:var(--notfound)}
+  .claim.flash{background:#fff2b8;border-radius:3px}
+
+  .cite-group{font-size:0;white-space:nowrap;line-height:0}
+  .bubble{font-family:var(--sans);display:inline-flex;align-items:center;justify-content:center;
+    width:1.15rem;height:1.15rem;border-radius:50%;border:0;padding:0;margin:0 .06rem 0 .16rem;
+    color:#fff;font-size:.66rem;font-weight:700;line-height:1;cursor:pointer;
+    vertical-align:.42em;transition:transform .12s ease,box-shadow .12s ease}
+  .bubble:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(20,20,30,.28)}
+  .bubble:focus-visible{outline:2px solid #1b1b1f;outline-offset:2px}
+  .bubble.active{box-shadow:0 0 0 3px rgba(27,27,31,.18)}
+
+  /* ---------- popover ---------- */
+  #popover{position:absolute;z-index:60;width:min(25rem,calc(100vw - 2rem));display:none;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 12px 34px -12px rgba(20,20,30,.42),0 2px 6px rgba(20,20,30,.06);
+    font-family:var(--sans);font-size:.87rem;line-height:1.55;color:var(--ink-soft);
+    padding:.95rem 1rem 1rem}
+  #popover.open{display:block}
+  #popover .pop-top{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.6rem}
+  #popover .pop-verdict{font-weight:700;font-size:.8rem;letter-spacing:.04em;text-transform:uppercase}
+  #popover.v-confirmed .pop-verdict{color:var(--confirmed)}
+  #popover.v-partial .pop-verdict{color:var(--partial)}
+  #popover.v-contradicted .pop-verdict{color:var(--contradicted)}
+  #popover.v-notfound .pop-verdict{color:var(--notfound)}
+  #popover .pop-close{background:none;border:0;color:var(--muted);font-size:1.1rem;line-height:1;
+    cursor:pointer;padding:.15rem .3rem;border-radius:6px}
+  #popover .pop-close:hover{background:#f2f2f5;color:var(--ink)}
+  #popover blockquote.excerpt{margin:0 0 .7rem;padding:.55rem .8rem;border-left:3px solid var(--line);
+    background:#f7f7f9;border-radius:0 8px 8px 0;
+    font-family:var(--serif);font-size:.92rem;line-height:1.6;color:var(--ink)}
+  #popover.v-confirmed blockquote.excerpt{border-left-color:var(--confirmed);background:var(--confirmed-bg)}
+  #popover.v-partial blockquote.excerpt{border-left-color:var(--partial);background:var(--partial-bg)}
+  #popover.v-contradicted blockquote.excerpt{border-left-color:var(--contradicted);background:var(--contradicted-bg)}
+  #popover.v-notfound blockquote.excerpt{border-left-color:var(--notfound);background:var(--notfound-bg)}
+  #popover .pop-src{font-size:.78rem;color:var(--muted);margin:0 0 .5rem}
+  #popover .pop-src b{color:var(--ink-soft);font-weight:600}
+  #popover .pop-note{font-size:.82rem;color:var(--ink-soft);margin:0 0 .6rem;padding-left:.6rem;
+    border-left:2px solid var(--line)}
+  #popover .pop-links{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.2rem}
+  #popover .pop-links a,#popover .pop-links button{
+    display:inline-block;font-size:.78rem;font-weight:600;text-decoration:none;font-family:var(--sans);
+    color:var(--ink);background:#f2f2f5;border:1px solid var(--line);border-radius:999px;
+    padding:.26rem .7rem;cursor:pointer}
+  #popover .pop-links a:hover,#popover .pop-links button:hover{background:#e9e9ee}
+
+  /* ---------- source viewers ---------- */
+  #sources{margin-top:3.5rem}
+  #sources>h2{font-family:var(--sans);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);font-weight:700;margin:0 0 1rem}
+  details.src{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    margin:0 0 .75rem;overflow:hidden}
+  details.src>summary{font-family:var(--sans);font-size:.9rem;font-weight:600;cursor:pointer;
+    padding:.8rem 1rem;list-style:none;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
+  details.src>summary::-webkit-details-marker{display:none}
+  details.src>summary::before{content:"▸";color:var(--muted);font-size:.8rem;transition:transform .15s ease}
+  details.src[open]>summary::before{transform:rotate(90deg)}
+  details.src>summary .sname{flex:1 1 auto}
+  details.src>summary .scount{font-size:.74rem;color:var(--muted);font-weight:500}
+  .src-note{font-family:var(--sans);font-size:.78rem;color:var(--muted);
+    padding:0 1rem .7rem;margin:0;border-bottom:1px solid var(--line)}
+  .src-body{padding:.85rem 0 1rem;max-height:34rem;overflow:auto}
+  .src-line{display:flex;gap:.75rem;padding:.02rem 1rem;font-family:var(--sans);
+    font-size:.85rem;line-height:1.62;color:var(--ink-soft)}
+  .src-line .ln{flex:0 0 2.5rem;text-align:right;color:#b6b8c0;font-size:.72rem;
+    font-family:var(--mono);user-select:none;padding-top:.18rem}
+  .src-line .lt{flex:1 1 auto;white-space:pre-wrap;word-break:break-word}
+  .src-line.blank .lt{min-height:.55rem}
+  mark.hit{background:#fff2b8;border-radius:3px;padding:.02rem .1rem;
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,.06);scroll-margin-top:6rem}
+  mark.hit.v-confirmed{background:var(--confirmed-bg);box-shadow:inset 0 -2px 0 var(--confirmed)}
+  mark.hit.v-partial{background:var(--partial-bg);box-shadow:inset 0 -2px 0 var(--partial)}
+  mark.hit.v-contradicted{background:var(--contradicted-bg);box-shadow:inset 0 -2px 0 var(--contradicted)}
+  mark.hit.pulse{animation:pulse 1.6s ease}
+  @keyframes pulse{0%,100%{background:#fff2b8}25%,60%{background:#ffd94d}}
+
+  footer.doc-foot{margin-top:3.5rem;padding-top:1.25rem;border-top:1px solid var(--line);
+    font-family:var(--sans);font-size:.78rem;color:var(--muted);line-height:1.6}
+  @media print{.bubble,#popover,#drop{display:none!important}details.src{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="doc-head">
+    <p class="kicker" id="kicker"></p>
+    <h1 class="doc-title" id="title"></h1>
+    <p class="doc-meta" id="meta"></p>
+  </header>
+
+  <section id="banner" aria-live="polite"></section>
+  <section id="summary" aria-live="polite"></section>
+
+  <article id="doc"></article>
+
+  <section id="sources"></section>
+
+  <footer class="doc-foot" id="foot"></footer>
+</div>
+
+<div id="popover" role="dialog" aria-modal="false"></div>
+
+<script src="./date.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // =====================================================================
+  //  Motorul copiei verificate.
+  //  Acest fișier NU se editează. Tot ce se schimbă între verificări stă
+  //  în date.js. Numerele de linie, marcajele, numerotarea bulelor și
+  //  totalurile sunt DERIVATE aici, la deschiderea paginii — nu sunt
+  //  scrise de mână. Un fragment care nu există în sursă nu poate primi
+  //  o bulă verde: pagina afișează o eroare în locul lui.
+  // =====================================================================
+
+  var D = window.FACTCHECK;
+  var VERDICTS = ["confirmed", "partial", "contradicted", "notfound"];
+
+  var DEFAULT_UI = {
+    verdicts: {confirmed:"Confirmat", partial:"Parțial",
+               contradicted:"Contrazis", notfound:"Negăsit în surse"},
+    labels: {
+      summaryTitle:"Rezultatul verificării", claimsChecked:"afirmații verificate",
+      citationsMade:"citări în surse", findingsTitle:"Ce necesită atenție",
+      noFindings:"Nicio problemă nerezolvată.", close:"Închide",
+      noExcerpt:"Niciun pasaj găsit în surse.", openSource:"Deschide sursa",
+      openOriginal:"Pagina originală", sourcesTitle:"Surse",
+      locatorLine:"linia {n}", locatorLines:"liniile {a}–{b}", locatorWeb:"{title}",
+      citesOne:"1 citare", citesMany:"{n} citări",
+      bannerOkTitle:"Copie verificată integral",
+      bannerOkBody:"Fiecare fragment citat a fost regăsit în textul sursei, iar textul verificat reproduce documentul original. Sursele au fost confruntate cu fișierele de pe disc.",
+      bannerWarnTitle:"Structură validă — surse neconfruntate cu originalele",
+      bannerWarnBody:"Fiecare fragment citat există în textul sursei inclus în această pagină, iar numerele de linie au fost calculate acum, la deschidere. Nu s-a verificat însă că textul inclus este identic cu fișierele originale. Trage fișierele aici pentru a închide bucla.",
+      bannerErrTitle:"Verificare eșuată",
+      bannerErrBody:"Pagina a găsit probleme structurale. Nu te baza pe bulele de mai jos până nu sunt rezolvate în date.js:",
+      dropTitle:"Trage aici documentul și fișierele sursă originale",
+      dropHint:"sau dă click ca să le alegi · nimic nu se trimite nicăieri, comparația se face în browser",
+      provOk:"identic cu originalul", provBad:"DIFERIT de originalul de pe disc",
+      provUnknown:"neconfruntat", provUnmatched:"nu corespunde niciunei surse din pagină",
+      provWeb:"sursă web — nu poate fi confruntată cu un fișier local"
+    }
+  };
+
+  // ---------------------------------------------------------------- utils
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function deepLabels(u) {
+    var out = {verdicts:{}, labels:{}};
+    var k;
+    for (k in DEFAULT_UI.verdicts) out.verdicts[k] = DEFAULT_UI.verdicts[k];
+    for (k in DEFAULT_UI.labels) out.labels[k] = DEFAULT_UI.labels[k];
+    if (u && u.verdicts) for (k in u.verdicts) out.verdicts[k] = u.verdicts[k];
+    if (u && u.labels) for (k in u.labels) out.labels[k] = u.labels[k];
+    return out;
+  }
+  function fmt(tpl, vals) {
+    return String(tpl).replace(/\{(\w+)\}/g, function (m, k) {
+      return vals[k] != null ? vals[k] : m;
+    });
+  }
+  function normText(s) { return String(s).replace(/\r\n/g, "\n").replace(/\r/g, "\n"); }
+
+  /* Whitespace-flexible search. The author writes a passage as one string;
+     in the file it may be broken across lines. Returns every match range. */
+  function findAll(hay, needle) {
+    var trimmed = String(needle).trim();
+    if (!trimmed) return [];
+    var pattern = trimmed
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\s+/g, "\\s+");
+    var re, out = [], m, guard = 0;
+    try { re = new RegExp(pattern, "g"); } catch (e) { return []; }
+    while ((m = re.exec(hay)) !== null) {
+      out.push({start: m.index, end: m.index + m[0].length});
+      if (m.index === re.lastIndex) re.lastIndex++;
+      if (++guard > 5000) break;
+    }
+    return out;
+  }
+  function lineOf(text, idx) {
+    var n = 1;
+    for (var i = 0; i < idx && i < text.length; i++) if (text.charCodeAt(i) === 10) n++;
+    return n;
+  }
+
+  // ---------------------------------------------------------------- boot
+  var errors = [];
+  if (!D || typeof D !== "object") {
+    document.getElementById("banner").className = "err";
+    document.getElementById("banner").innerHTML =
+      '<p class="b-title"><span class="ico">✖</span>Datele lipsesc</p>' +
+      '<p>Fișierul <code>date.js</code> nu a fost găsit sau nu definește ' +
+      '<code>window.FACTCHECK</code>. Cele două fișiere trebuie să stea în același folder.</p>';
+    return;
+  }
+
+  var UI = deepLabels(D.ui);
+  var L = UI.labels;
+  var docText = normText(D.document && D.document.text || "");
+  var sources = Array.isArray(D.sources) ? D.sources : [];
+  var claims = Array.isArray(D.claims) ? D.claims : [];
+  var cites = Array.isArray(D.citations) ? D.citations : [];
+
+  document.documentElement.lang = D.lang || "ro";
+  document.getElementById("kicker").textContent = D.kicker || "";
+  document.getElementById("title").textContent = D.title || (D.document && D.document.name) || "";
+  document.getElementById("meta").textContent = D.meta || "";
+  document.getElementById("foot").innerHTML = D.footer || "";
+  if (D.title) document.title = D.title;
+
+  var srcById = {};
+  sources.forEach(function (s) {
+    s.text = normText(s.text || "");
+    if (srcById[s.id]) errors.push("Două surse au același <code>id</code>: <code>" + esc(s.id) + "</code>.");
+    srcById[s.id] = s;
+  });
+
+  // ------------------------------------------------- resolve the citations
+  var citeById = {};
+  cites.forEach(function (c) {
+    if (citeById[c.id]) {
+      errors.push("Două citări au același <code>id</code>: <code>" + esc(c.id) + "</code>.");
+      return;
+    }
+    citeById[c.id] = c;
+
+    if (VERDICTS.indexOf(c.verdict) === -1) {
+      errors.push("Citarea <code>" + esc(c.id) + "</code> are un verdict necunoscut: <code>" +
+                  esc(c.verdict) + "</code>. Valori permise: " + VERDICTS.join(", ") + ".");
+      return;
+    }
+    if (c.verdict === "notfound") {
+      if (c.excerpt && String(c.excerpt).trim())
+        errors.push("Citarea <code>" + esc(c.id) + "</code> este <code>notfound</code>, " +
+                    "dar are un fragment. Un pasaj negăsit nu poate fi citat.");
+      if (!c.note || !String(c.note).trim())
+        errors.push("Citarea <code>" + esc(c.id) + "</code> este <code>notfound</code> " +
+                    "fără notă. Nota trebuie să spună ce s-a căutat, local și pe web.");
+      return;
+    }
+
+    var src = srcById[c.source];
+    if (!src) {
+      errors.push("Citarea <code>" + esc(c.id) + "</code> trimite la sursa <code>" +
+                  esc(c.source) + "</code>, care nu există în <code>sources</code>.");
+      return;
+    }
+    if (!c.excerpt || !String(c.excerpt).trim()) {
+      errors.push("Citarea <code>" + esc(c.id) + "</code> nu are fragment. " +
+                  "Doar verdictul <code>notfound</code> poate rămâne fără pasaj.");
+      return;
+    }
+
+    var hits = findAll(src.text, c.excerpt);
+    if (!hits.length) {
+      errors.push("Fragmentul citării <code>" + esc(c.id) + "</code> NU există în sursa <b>" +
+                  esc(src.name) + "</b>. Nu a fost copiat din sursă sau a fost reformulat.");
+      return;
+    }
+    var occ = c.excerptOccurrence || 1;
+    if (hits.length > 1 && !c.excerptOccurrence) {
+      errors.push("Fragmentul citării <code>" + esc(c.id) + "</code> apare de " + hits.length +
+                  " ori în <b>" + esc(src.name) + "</b>. Adaugă <code>excerptOccurrence</code> " +
+                  "sau alege un pasaj mai lung.");
+      return;
+    }
+    if (occ < 1 || occ > hits.length) {
+      errors.push("Citarea <code>" + esc(c.id) + "</code> cere apariția " + occ + ", dar " +
+                  "fragmentul apare de " + hits.length + " ori în <b>" + esc(src.name) + "</b>.");
+      return;
+    }
+
+    var hit = hits[occ - 1];
+    c._src = src;
+    c._range = hit;
+    if (src.kind === "web") {
+      c._locator = fmt(L.locatorWeb, {title: src.title || src.name}) +
+                   (c.hint ? " · " + c.hint : "");
+    } else {
+      var a = lineOf(src.text, hit.start), b = lineOf(src.text, hit.end - 1);
+      c._line = a;
+      c._locator = (a === b ? fmt(L.locatorLine, {n: a}) : fmt(L.locatorLines, {a: a, b: b})) +
+                   (c.hint ? " · " + c.hint : "");
+    }
+  });
+
+  // ------------------------------------------------- resolve the claims
+  var used = {};
+  var placed = [];
+  claims.forEach(function (cl, i) {
+    var ids = Array.isArray(cl.cites) ? cl.cites : [];
+    if (!ids.length) {
+      errors.push("Afirmația " + (i + 1) + " („" + esc(String(cl.text).slice(0, 40)) +
+                  "…”) nu are nicio citare.");
+      return;
+    }
+    var bad = ids.filter(function (id) { return !citeById[id]; });
+    if (bad.length) {
+      errors.push("Afirmația " + (i + 1) + " trimite la citări inexistente: <code>" +
+                  esc(bad.join(", ")) + "</code>.");
+      return;
+    }
+    ids.forEach(function (id) { used[id] = true; });
+
+    var hits = findAll(docText, cl.text);
+    if (!hits.length) {
+      errors.push("Textul afirmației " + (i + 1) + " NU se găsește în document: „" +
+                  esc(String(cl.text).slice(0, 70)) + "…”. Trebuie copiat exact din document.");
+      return;
+    }
+    var occ = cl.occurrence || 1;
+    if (hits.length > 1 && !cl.occurrence) {
+      errors.push("Textul afirmației " + (i + 1) + " apare de " + hits.length +
+                  " ori în document. Adaugă <code>occurrence</code>.");
+      return;
+    }
+    if (occ < 1 || occ > hits.length) {
+      errors.push("Afirmația " + (i + 1) + " cere apariția " + occ + ", dar textul apare de " +
+                  hits.length + " ori.");
+      return;
+    }
+    placed.push({claim: cl, range: hits[occ - 1], ids: ids});
+  });
+
+  cites.forEach(function (c) {
+    if (!used[c.id]) errors.push("Citarea <code>" + esc(c.id) +
+      "</code> nu este folosită de nicio afirmație.");
+  });
+
+  placed.sort(function (a, b) { return a.range.start - b.range.start; });
+  for (var i = 1; i < placed.length; i++) {
+    if (placed[i].range.start < placed[i - 1].range.end) {
+      errors.push("Două afirmații se suprapun în document („" +
+        esc(String(placed[i - 1].claim.text).slice(0, 30)) + "…” și „" +
+        esc(String(placed[i].claim.text).slice(0, 30)) + "…”). Scurtează una dintre ele.");
+    }
+  }
+
+  // bubble numbers follow reading order
+  var order = [], seen = {};
+  placed.forEach(function (p) {
+    p.ids.forEach(function (id) {
+      if (!seen[id]) { seen[id] = order.length + 1; order.push(id); }
+    });
+  });
+
+  // ------------------------------------------------- render the document
+  /* Rebuilt from the RAW text, character by character. Markdown markers are
+     CONSUMED rather than displayed, and claim spans open and close at their
+     exact raw offsets — so a claim that sits inside **bold** still renders as
+     bold text, not as literal asterisks. A self-check at the end compares what
+     was rendered against the original, so a renderer bug becomes a visible
+     error instead of a silent misquote. */
+  function bubbles(ids) {
+    var h = '<span class="cite-group">';
+    ids.forEach(function (id) {
+      var c = citeById[id];
+      h += '<button class="bubble v-' + esc(c.verdict) + '" data-cite="' + esc(id) +
+           '" type="button" title="' + esc(UI.verdicts[c.verdict]) + '">' +
+           (seen[id] || "?") + "</button>";
+    });
+    return h + "</span>";
+  }
+  function claimAt(idx) {
+    for (var i = 0; i < placed.length; i++) {
+      if (idx >= placed[i].range.start && idx < placed[i].range.end) return placed[i];
+    }
+    return null;
+  }
+  function worstOf(ids) {
+    return ids.map(function (id) { return citeById[id].verdict; })
+      .sort(function (x, y) { return VERDICTS.indexOf(y) - VERDICTS.indexOf(x); })[0];
+  }
+  function isSpace(ch) { return !ch || /\s/.test(ch); }
+
+  /* Split raw text into blocks, remembering each block's *content* offsets
+     (i.e. after the leading #, > or bullet marker). */
+  function blocksOf(text) {
+    var out = [], lines = text.split("\n"), pos = 0, buf = null;
+    function flush() { if (buf) out.push(buf); buf = null; }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i], start = pos, end = pos + line.length;
+      pos = end + 1;
+      if (!line.trim()) { flush(); continue; }
+      if (/^\s*([-*_])\s*(\1\s*){2,}$/.test(line)) { flush(); out.push({kind: "hr"}); continue; }
+      var h = /^(#{1,6})\s+/.exec(line);
+      if (h) {
+        flush();
+        out.push({kind: "h", level: h[1].length, start: start + h[0].length, end: end});
+        continue;
+      }
+      var q = /^>\s?/.exec(line);
+      if (q) {
+        if (buf && buf.kind === "quote") buf.end = end;
+        else { flush(); buf = {kind: "quote", start: start, end: end}; }
+        continue;
+      }
+      var li = /^(\s*(?:[-*+]|\d+[.)])\s+)/.exec(line);
+      if (li) {
+        var item = {start: start + li[1].length, end: end};
+        if (buf && buf.kind === "list") { buf.items.push(item); buf.end = end; }
+        else { flush(); buf = {kind: "list", start: start, end: end, items: [item]}; }
+        continue;
+      }
+      if (buf && buf.kind === "p") buf.end = end;
+      else if (buf && buf.kind === "quote") buf.end = end;
+      else if (buf && buf.kind === "list") {
+        buf.items[buf.items.length - 1].end = end;
+        buf.end = end;
+      } else { flush(); buf = {kind: "p", start: start, end: end}; }
+    }
+    flush();
+    return out;
+  }
+
+  /* Render raw text [from,to) into HTML, consuming inline markers. */
+  function renderRange(from, to, stripQuote) {
+    var html = "", run = "", fmt = {b: false, i: false, code: false, link: null};
+    var curClaim = null, lineStart = true, i = from;
+
+    function flush() {
+      if (!run) return;
+      var t = esc(run);
+      if (fmt.code) t = "<code>" + t + "</code>";
+      if (fmt.b) t = "<b>" + t + "</b>";
+      if (fmt.i) t = "<i>" + t + "</i>";
+      if (fmt.link) t = '<a href="' + esc(fmt.link) + '" target="_blank" rel="noopener">' + t + "</a>";
+      html += t;
+      run = "";
+    }
+    function setClaim(p) {
+      if (p === curClaim) return;
+      flush();
+      if (curClaim) html += "</span>" + bubbles(curClaim.ids);
+      if (p) html += '<span class="claim s-' + esc(worstOf(p.ids)) + '" data-claim="' +
+                     esc(p.ids.join(" ")) + '">';
+      curClaim = p;
+    }
+
+    while (i < to) {
+      var ch = docText.charAt(i);
+      if (ch === "\n") { setClaim(claimAt(i)); run += " "; i++; lineStart = true; continue; }
+      if (lineStart) {
+        lineStart = false;
+        if (stripQuote) {
+          var q = /^>[ \t]?/.exec(docText.slice(i, to));
+          if (q) { i += q[0].length; continue; }
+        }
+      }
+      setClaim(claimAt(i));
+      if (ch === "`") { flush(); fmt.code = !fmt.code; i++; continue; }
+      if (!fmt.code) {
+        if (docText.substr(i, 2) === "**") { flush(); fmt.b = !fmt.b; i += 2; continue; }
+        if (ch === "*" && (fmt.i || !isSpace(docText.charAt(i + 1)))) {
+          flush(); fmt.i = !fmt.i; i++; continue;
+        }
+        if (ch === "_" && (fmt.i ? isSpace(docText.charAt(i + 1)) : isSpace(docText.charAt(i - 1)))) {
+          flush(); fmt.i = !fmt.i; i++; continue;
+        }
+        var lk = /^\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/.exec(docText.slice(i, to));
+        if (lk) {
+          flush();
+          fmt.link = lk[2];
+          for (var k = 0; k < lk[1].length; k++) {
+            setClaim(claimAt(i + 1 + k));
+            run += lk[1].charAt(k);
+          }
+          flush();
+          fmt.link = null;
+          i += lk[0].length;
+          continue;
+        }
+      }
+      run += ch;
+      i++;
+    }
+    flush();
+    if (curClaim) html += "</span>" + bubbles(curClaim.ids);
+    return html;
+  }
+
+  function renderBlock(b) {
+    if (b.kind === "hr") return "<hr>";
+    if (b.kind === "h") {
+      var lvl = Math.min(3, Math.max(2, b.level));
+      return "<h" + lvl + ">" + renderRange(b.start, b.end, false) + "</h" + lvl + ">";
+    }
+    if (b.kind === "quote")
+      return "<blockquote><p>" + renderRange(b.start, b.end, true) + "</p></blockquote>";
+    if (b.kind === "list")
+      return "<ul>" + b.items.map(function (it) {
+        return "<li>" + renderRange(it.start, it.end, false) + "</li>";
+      }).join("") + "</ul>";
+    return "<p>" + renderRange(b.start, b.end, false) + "</p>";
+  }
+
+  var blocks = blocksOf(docText);
+
+  /* A claim must live inside a single block — otherwise it cannot be underlined
+     in place, and half of it would silently lose its bubbles. */
+  var ranges = [];
+  blocks.forEach(function (b) {
+    if (b.kind === "list") b.items.forEach(function (it) { ranges.push(it); });
+    else if (b.kind !== "hr") ranges.push(b);
+  });
+  placed = placed.filter(function (p) {
+    var ok = ranges.some(function (r) {
+      return p.range.start >= r.start && p.range.end <= r.end;
+    });
+    if (!ok) errors.push("Afirmația „" + esc(String(p.claim.text).slice(0, 40)) +
+      "…” trece peste un rând gol sau peste un titlu. O afirmație trebuie să stea " +
+      "într-un singur paragraf; împarte-o în două.");
+    return ok;
+  });
+
+  document.getElementById("doc").innerHTML = blocks.map(renderBlock).join("\n");
+
+  /* Self-check: does the rendered page reproduce the document word for word?
+     Compared along an independent path (regex stripping vs the state machine
+     above), so a bug in one does not hide a bug in the other. */
+  (function () {
+    var clone = document.getElementById("doc").cloneNode(true);
+    Array.prototype.forEach.call(clone.querySelectorAll(".cite-group"), function (n) {
+      n.parentNode.removeChild(n);
+    });
+    function bare(s) {
+      return s.replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
+    }
+    var rawPlain = bare(docText
+      .replace(/^\s*([-*_])\s*(\1\s*){2,}$/gm, " ")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/^>\s?/gm, "")
+      .replace(/^(\s*)(?:[-*+]|\d+[.)])\s+/gm, "$1")
+      .replace(/\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/g, "$1"));
+    var shown = bare(clone.textContent || "");
+    if (shown !== rawPlain) {
+      var n = 0;
+      while (n < shown.length && n < rawPlain.length && shown.charAt(n) === rawPlain.charAt(n)) n++;
+      errors.push("Textul afișat nu reproduce documentul original. Prima diferență în jurul " +
+        "caracterului " + n + ": afișat „…" + esc(shown.substr(Math.max(0, n - 30), 60)) +
+        "…”, original „…" + esc(rawPlain.substr(Math.max(0, n - 30), 60)) + "…”.");
+    }
+  })();
+
+  // ------------------------------------------------- render source viewers
+  var srcWrap = document.getElementById("sources");
+  if (sources.length) {
+    var html = "<h2>" + esc(L.sourcesTitle) + "</h2>";
+    sources.forEach(function (s) {
+      var marks = cites.filter(function (c) { return c._src === s; });
+      html += '<details class="src" id="src-' + esc(s.id) + '"' +
+              (marks.length ? "" : "") + ">" +
+              '<summary><span class="sname">' + esc(s.name) + "</span>" +
+              '<span class="scount">' +
+              (marks.length === 1 ? L.citesOne : fmt(L.citesMany, {n: marks.length})) +
+              "</span></summary>";
+      if (s.note) html += '<p class="src-note">' + esc(s.note) + "</p>";
+      html += '<div class="src-body">' + renderSource(s, marks) + "</div></details>";
+    });
+    srcWrap.innerHTML = html;
+  }
+
+  function renderSource(s, marks) {
+    var lines = s.text.split("\n"), pos = 0, out = "";
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i], start = pos, end = pos + line.length;
+      pos = end + 1;
+      var body = "", cur = start;
+      marks.forEach(function (c) {
+        var ms = Math.max(c._range.start, start), me = Math.min(c._range.end, end);
+        if (ms < me) {
+          body += esc(line.slice(cur - start, ms - start));
+          body += '<mark class="hit v-' + esc(c.verdict) + '" id="m-' + esc(c.id) + '-' + i + '">' +
+                  esc(line.slice(ms - start, me - start)) + "</mark>";
+          cur = me;
+        }
+      });
+      body += esc(line.slice(cur - start));
+      out += '<div class="src-line' + (line.trim() ? "" : " blank") + '">' +
+             '<span class="ln">' + (i + 1) + "</span>" +
+             '<span class="lt">' + body + "</span></div>";
+    }
+    return out;
+  }
+
+  // ------------------------------------------------- summary strip
+  function renderSummary() {
+    var counts = {confirmed:0, partial:0, contradicted:0, notfound:0};
+    cites.forEach(function (c) { if (counts[c.verdict] != null) counts[c.verdict]++; });
+    var h = "<h2>" + esc(L.summaryTitle) + "</h2>" +
+      '<p class="sum-count"><b>' + placed.length + "</b> " + esc(L.claimsChecked) +
+      " · <b>" + cites.length + "</b> " + esc(L.citationsMade) + "</p>" +
+      '<div class="chips">';
+    VERDICTS.forEach(function (v) {
+      if (!counts[v]) return;
+      h += '<span class="chip v-' + v + '"><span class="dot"></span>' +
+           esc(UI.verdicts[v]) + " · " + counts[v] + "</span>";
+    });
+    h += "</div>";
+
+    var flagged = order.filter(function (id) { return citeById[id].verdict !== "confirmed"; });
+    h += '<div id="findings"><p class="findings-label">' + esc(L.findingsTitle) + "</p>";
+    if (!flagged.length) {
+      h += "<p>" + esc(L.noFindings) + "</p>";
+    } else {
+      flagged.forEach(function (id) {
+        var c = citeById[id];
+        h += '<button class="finding v-' + esc(c.verdict) + '" data-goto="' + esc(id) + '" type="button">' +
+             '<span class="fnum">' + seen[id] + "</span>" +
+             '<span class="ftext"><span class="fverdict">' + esc(UI.verdicts[c.verdict]) + "</span> — " +
+             esc(c.note || (c._src ? c._src.name : "")) + "</span></button>";
+      });
+    }
+    document.getElementById("summary").innerHTML = h + "</div>";
+  }
+  renderSummary();
+
+  // ------------------------------------------------- popover
+  var pop = document.getElementById("popover"), activeBubble = null;
+
+  function closePop() {
+    pop.className = "";
+    if (activeBubble) activeBubble.classList.remove("active");
+    activeBubble = null;
+  }
+  function textFragment(c) {
+    var words = String(c.excerpt).trim().split(/\s+/);
+    for (var n = 5; n <= Math.min(12, words.length); n++) {
+      var phrase = words.slice(0, n).join(" ");
+      if (findAll(c._src.text, phrase).length === 1)
+        return c._src.url + "#:~:text=" + encodeURIComponent(phrase);
+    }
+    return c._src.url;
+  }
+  function openPop(bubble) {
+    var c = citeById[bubble.getAttribute("data-cite")];
+    if (!c) return;
+    var h = '<div class="pop-top"><span class="pop-verdict">' + esc(UI.verdicts[c.verdict]) +
+            '</span><button class="pop-close" type="button" aria-label="' + esc(L.close) + '">✕</button></div>';
+    if (c._src) {
+      h += '<p class="pop-src"><b>' + esc(c._src.name) + "</b>" +
+           (c._locator ? " · " + esc(c._locator) : "") + "</p>";
+    }
+    h += c.excerpt && c._src
+      ? "<blockquote class=\"excerpt\">" + esc(c.excerpt) + "</blockquote>"
+      : '<p class="pop-src">' + esc(L.noExcerpt) + "</p>";
+    if (c.note) h += '<p class="pop-note">' + esc(c.note) + "</p>";
+    if (c._src) {
+      h += '<div class="pop-links"><button type="button" data-open="' + esc(c.id) + '">' +
+           esc(L.openSource) + "</button>";
+      if (c._src.kind === "web" && c._src.url)
+        h += '<a href="' + esc(textFragment(c)) + '" target="_blank" rel="noopener">' +
+             esc(L.openOriginal) + "</a>";
+      h += "</div>";
+    }
+    pop.innerHTML = h;
+    pop.className = "open v-" + c.verdict;
+
+    var r = bubble.getBoundingClientRect();
+    var top = r.bottom + window.scrollY + 8;
+    var left = r.left + window.scrollX - 20;
+    var maxLeft = window.scrollX + document.documentElement.clientWidth - pop.offsetWidth - 12;
+    pop.style.top = top + "px";
+    pop.style.left = Math.max(window.scrollX + 12, Math.min(left, maxLeft)) + "px";
+
+    if (activeBubble) activeBubble.classList.remove("active");
+    activeBubble = bubble;
+    bubble.classList.add("active");
+  }
+
+  function revealSource(id) {
+    var c = citeById[id];
+    if (!c || !c._src) return;
+    var det = document.getElementById("src-" + c._src.id);
+    if (det) det.open = true;
+    var m = document.querySelector('mark[id^="m-' + CSS.escape(id) + '-"]');
+    if (m) {
+      m.scrollIntoView({behavior: "smooth", block: "center"});
+      m.classList.remove("pulse");
+      void m.offsetWidth;
+      m.classList.add("pulse");
+    }
+  }
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest(".bubble") : null;
+    if (b) { e.preventDefault(); openPop(b); return; }
+    if (e.target.closest && e.target.closest(".pop-close")) { closePop(); return; }
+    var op = e.target.closest && e.target.closest("[data-open]");
+    if (op) { revealSource(op.getAttribute("data-open")); return; }
+    var go = e.target.closest && e.target.closest("[data-goto]");
+    if (go) {
+      var id = go.getAttribute("data-goto");
+      var target = document.querySelector('.bubble[data-cite="' + CSS.escape(id) + '"]');
+      if (target) {
+        var cl = target.previousElementSibling;
+        if (cl && cl.classList.contains("claim")) {
+          cl.scrollIntoView({behavior: "smooth", block: "center"});
+          cl.classList.remove("flash"); void cl.offsetWidth; cl.classList.add("flash");
+          setTimeout(function () { cl.classList.remove("flash"); }, 1400);
+        }
+        setTimeout(function () { openPop(target); }, 420);
+      }
+      return;
+    }
+    if (!e.target.closest || !e.target.closest("#popover")) closePop();
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePop(); });
+  window.addEventListener("resize", closePop);
+
+  // ------------------------------------------------- banner + provenance
+  var fileSources = sources.filter(function (s) { return s.kind !== "web"; });
+  var prov = {};
+
+  function renderBanner() {
+    var el = document.getElementById("banner");
+    var h = "";
+    var allChecked = fileSources.length > 0 && fileSources.every(function (s) {
+      return prov[s.id] === "ok";
+    }) && prov.__doc === "ok";
+
+    if (errors.length) {
+      el.className = "err";
+      h = '<p class="b-title"><span class="ico">✖</span>' + esc(L.bannerErrTitle) + "</p>" +
+          "<p>" + esc(L.bannerErrBody) + "</p><ul>" +
+          errors.map(function (m) { return "<li>" + m + "</li>"; }).join("") + "</ul>";
+    } else if (allChecked) {
+      el.className = "ok";
+      h = '<p class="b-title"><span class="ico">✔</span>' + esc(L.bannerOkTitle) + "</p>" +
+          "<p>" + esc(L.bannerOkBody) + "</p>";
+    } else {
+      el.className = "warn";
+      h = '<p class="b-title"><span class="ico">◆</span>' + esc(L.bannerWarnTitle) + "</p>" +
+          "<p>" + esc(L.bannerWarnBody) + "</p>";
+    }
+
+    if (!errors.length || Object.keys(prov).length) {
+      h += '<div id="drop"><b>' + esc(L.dropTitle) + "</b><small>" + esc(L.dropHint) + "</small>" +
+           '<input type="file" id="picker" multiple></div>';
+      var rows = [];
+      if (D.document && D.document.name) {
+        rows.push({name: D.document.name, state: prov.__doc, web: false});
+      }
+      sources.forEach(function (s) {
+        rows.push({name: s.name, state: s.kind === "web" ? "web" : prov[s.id], web: s.kind === "web"});
+      });
+      var extra = prov.__extra || [];
+      h += '<ul class="prov-list">' + rows.map(function (r) {
+        var mark = r.state === "ok" ? "✔" : r.state === "bad" ? "✖" : r.state === "web" ? "◇" : "·";
+        var lab = r.state === "ok" ? L.provOk : r.state === "bad" ? L.provBad
+                : r.state === "web" ? L.provWeb : L.provUnknown;
+        return '<li><span class="pmark">' + mark + "</span><span>" + esc(r.name) +
+               " — " + esc(lab) + "</span></li>";
+      }).join("") + extra.map(function (n) {
+        return '<li><span class="pmark">?</span><span>' + esc(n) + " — " +
+               esc(L.provUnmatched) + "</span></li>";
+      }).join("") + "</ul>";
+    }
+    el.innerHTML = h;
+  }
+
+  function absorb(files) {
+    var pending = files.length;
+    if (!pending) return;
+    prov.__extra = prov.__extra || [];
+    Array.prototype.forEach.call(files, function (f) {
+      var fr = new FileReader();
+      fr.onload = function () {
+        var got = normText(String(fr.result));
+        var matched = false;
+        if (D.document && D.document.name === f.name) {
+          prov.__doc = got.trim() === docText.trim() ? "ok" : "bad";
+          matched = true;
+        }
+        sources.forEach(function (s) {
+          if (s.kind !== "web" && s.name === f.name) {
+            prov[s.id] = got.trim() === s.text.trim() ? "ok" : "bad";
+            matched = true;
+          }
+        });
+        if (!matched && prov.__extra.indexOf(f.name) === -1) prov.__extra.push(f.name);
+        if (--pending === 0) renderBanner();
+      };
+      fr.onerror = function () { if (--pending === 0) renderBanner(); };
+      fr.readAsText(f);
+    });
+  }
+
+  renderBanner();
+
+  document.addEventListener("click", function (e) {
+    if (e.target.closest && e.target.closest("#drop") && e.target.id !== "picker") {
+      var p = document.getElementById("picker");
+      if (p) p.click();
+    }
+  });
+  document.addEventListener("change", function (e) {
+    if (e.target && e.target.id === "picker") absorb(e.target.files);
+  });
+  ["dragenter", "dragover"].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      if (e.target.closest && e.target.closest("#drop")) {
+        e.preventDefault();
+        document.getElementById("drop").classList.add("hot");
+      }
+    });
+  });
+  document.addEventListener("dragleave", function (e) {
+    var d = document.getElementById("drop");
+    if (d && e.target.closest && e.target.closest("#drop")) d.classList.remove("hot");
+  });
+  document.addEventListener("drop", function (e) {
+    if (e.target.closest && e.target.closest("#drop")) {
+      e.preventDefault();
+      document.getElementById("drop").classList.remove("hot");
+      absorb(e.dataTransfer.files);
+    }
+  });
+})();
+</script>
+</body>
+</html>
